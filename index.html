@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小学语文同步听写-终极全功能版</title>
+    <style>
+        :root { --primary: #648dd1; --bg: #f0f2f5; --danger: #e56b60; --success: #78c2ad; --text: #333; }
+        body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: var(--bg); margin: 0; padding: 10px; display: flex; justify-content: center; }
+        .container { background: white; width: 100%; max-width: 500px; border-radius: 24px; box-shadow: 0 12px 40px rgba(0,0,0,0.08); overflow: hidden; display: flex; flex-direction: column; height: 98vh; }
+        .nav-tabs { display: flex; background: #fff; border-bottom: 1px solid #eee; flex-shrink: 0; }
+        .tab-item { flex: 1; text-align: center; padding: 18px 0; cursor: pointer; font-weight: bold; color: #999; position: relative; }
+        .tab-item.active { color: var(--primary); }
+        .tab-item.active::after { content: ''; position: absolute; bottom: 0; left: 25%; width: 50%; height: 3px; background: var(--primary); border-radius: 3px; }
+        .module-content { flex: 1; overflow-y: auto; padding: 20px; }
+        .view-panel { display: none; }
+        .view-panel.active { display: block; }
+        .card-box { background: #f8f9fa; padding: 15px; border-radius: 16px; margin-bottom: 15px; border: 1px solid #f0f0f0; }
+        label { display: block; margin-bottom: 4px; font-weight: bold; color: #666; font-size: 13px; }
+        select, input, textarea { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid #ddd; font-size: 15px; box-sizing: border-box; margin-bottom: 8px; outline: none; background: #fff; }
+        textarea { resize: vertical; min-height: 80px; }
+        .player-card { text-align: center; padding: 30px 10px; border: 2px dashed #d0d7de; border-radius: 20px; margin: 15px 0; background: #fff; min-height: 140px; display: flex; flex-direction: column; justify-content: center; }
+        #wordHidden { font-size: 48px; font-weight: bold; color: var(--primary); }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 14px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; display: block; }
+        .btn-stop { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; padding: 16px; border-radius: 14px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; display: none; }
+        .btn-group-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .btn-sub { background: #edf2f7; border: none; padding: 12px; border-radius: 12px; color: #4a5568; font-weight: bold; cursor: pointer; }
+        .word-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .word-tag { padding: 15px; border: 2px solid #eee; border-radius: 14px; text-align: center; cursor: pointer; font-weight: bold; background: #fff; font-size: 18px; }
+        .word-tag.done { border-color: var(--success); color: var(--success); background: #f6ffed; }
+        .word-tag.still-wrong { border-color: var(--danger); color: var(--danger); background: #fff1f0; }
+        .mistake-item { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 8px; border: 1px solid #eee; }
+        .btn-del { color: var(--danger); font-size: 14px; cursor: pointer; padding: 5px 10px; border: 1px solid #ffccc7; border-radius: 6px; background: #fff1f0; }
+        .badge { background: var(--danger); color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; vertical-align: middle; margin-left: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="nav-tabs">
+        <div class="tab-item active" onclick="switchModule('dictation')">听写模块</div>
+        <div class="tab-item" onclick="switchModule('mistakeBook')">错题本<span id="mistakeBadge" class="badge">0</span></div>
+    </div>
+
+    <div class="module-content">
+        <div id="dictationView" class="view-panel active">
+            <div class="card-box">
+                <label>练习模式</label>
+                <select id="modeSelect" onchange="toggleMode()">
+                    <option value="textbook">课本同步联动听写</option>
+                    <option value="custom">✨ 自定义词语听写</option>
+                    <option value="mistakeMode">🔥 错题强化挑战</option>
+                </select>
+
+                <div id="textbookControls">
+                    <label>教材版本</label>
+                    <select id="verSelect" onchange="updateUnits()"></select>
+                    <label>选择单元 / 类型</label>
+                    <select id="unitSelect" onchange="updateLessons()"></select>
+                    <label>选择课文 / 序号</label>
+                    <select id="lessonSelect"></select>
+                </div>
+
+                <div id="customControls" style="display:none;">
+                    <label>输入自定义词语 (空格或逗号分隔)</label>
+                    <textarea id="customWordsInput" placeholder="在此输入新词语..."></textarea>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1"><label>间隔(s)</label><input type="number" id="interval" value="6"></div>
+                    <div style="flex:1"><label>遍数</label><input type="number" id="repeat" value="2"></div>
+                </div>
+            </div>
+
+            <div class="player-card">
+                <div id="wordHidden">准备就绪</div>
+                <div id="progressInfo" style="color:#999; font-size:13px; margin-top:10px;">点击下方开始</div>
+                <div id="reinforceArea" style="display:none; margin-top:20px;">
+                    <div id="reinforceTip" style="font-weight:bold; font-size:14px; margin-bottom:8px;"></div>
+                    <div class="word-grid" id="checkGrid"></div>
+                </div>
+            </div>
+
+            <button id="startBtn" class="btn-main" onclick="startDictation()">🚀 开始报听写</button>
+            <button id="stopBtn" class="btn-stop" onclick="stopAndSwitch()">⏹ 停止并重选单元</button>
+
+            <div class="btn-group-nav">
+                <button class="btn-sub" onclick="navControl('prev')">上一个</button>
+                <button class="btn-sub" onclick="navControl('replay')">重读</button>
+                <button class="btn-sub" onclick="navControl('next')">下一个</button>
+            </div>
+        </div>
+
+        <div id="mistakeBookView" class="view-panel">
+            <button class="btn-main" onclick="quickDictMistakes()">🎧 听写所有错题</button>
+            <div id="mistakeList"></div>
+            <button class="btn-sub" style="width:100%; margin-top:20px; color:red;" onclick="clearAllMistakes()">清空全部错题</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * --- 核心词库：包含全册词语表(240词) + 知识清单(300词) ---
+ */
+const TEXTBOOK_DATA = {
+    "人教版语文二下": {
+        "词语表 (图片内容：240词)": {
+            "2.春天": ["春天", "寻找", "眉毛", "野花", "柳枝", "桃花"],
+            "3.鲜花": ["鲜花", "先生", "原来", "大叔", "太太", "做客", "正巧", "惊奇", "快活", "美好", "礼物"],
+            "4.植树": ["植树", "碧空如洗", "万里无云", "格外", "引人注目", "休息", "小心", "笔直"],
+            "5.雷锋": ["雷锋", "叔叔", "昨天", "温暖", "爱心"],
+            "6.好奇": ["好奇", "也许", "桌子", "平时", "难道", "平常", "农民", "加工", "农具", "甜菜", "工具", "劳动", "经过", "应该"],
+            "7.弱小": ["弱小", "周末", "父母", "吸引", "芬芳", "背包", "雨衣", "为什么", "勇敢"],
+            "识字1.神州": ["神州", "中华", "山川", "长江", "长城", "民族", "情谊"],
+            "识字2.传统": ["传统", "节日", "春节", "花灯", "清明节", "先人", "龙舟", "中秋", "转眼", "团圆"],
+            "识字3.故事": ["故事", "生活", "甲骨文", "样子", "钱币", "钱财", "有关"],
+            "识字4.美食": ["美食", "茄子", "烤鸭", "水煮鱼", "羊肉", "蛋炒饭"],
+            "8.彩色": ["彩色", "铅笔盒", "森林", "雪松", "歌声", "苹果", "精灵", "季节", "流动"],
+            "9.出色": ["出色", "妹妹", "碧绿", "波纹", "恋恋不舍", "柳树", "枝条", "不时"],
+            "10.绿色": ["绿色", "一直", "说话", "童话", "阿姨", "发现", "弟弟", "发明", "拼音", "字母", "上升"],
+            "11.亡羊补牢": ["亡羊补牢", "劝告", "禾苗", "力气", "明白"],
+            "12.杨桃": ["杨桃", "图画", "讲桌", "座位", "教室", "老老实实", "时候", "哈哈大笑", "五角星", "画纸", "神情"],
+            "13.愿意": ["愿意", "飞快", "为难", "伯伯", "立刻", "突然", "吃惊", "认真", "难为情"],
+            "15.雷雨": ["雷雨", "乌云", "黑沉沉", "闪电", "雷声", "窗户", "清新", "迎面"],
+            "16.野外": ["野外", "天然", "指南针", "帮助", "方向", "忠实", "向导", "指点", "北极星", "永远", "黑夜", "帮忙", "特别", "积雪"],
+            "17.航天员": ["航天员", "宇宙飞船", "空间站", "活动", "主要", "方便", "直接", "浴桶", "清理", "实在", "通常"],
+            "18.大象": ["大象", "耳朵", "扇子", "似得", "慢慢", "遇到", "一定", "每天", "睡觉", "经常", "人家"],
+            "19.决定": ["决定", "商店", "河马", "工夫", "终于", "星期"],
+            "20.青蛙": ["青蛙", "野鸭", "泉水", "花丛", "尽情", "游泳"],
+            "21.新奇": ["新奇", "目光", "到处", "仿佛", "周游", "任何", "事情", "纺织", "怎样", "以前", "灵巧", "色彩", "花纹"],
+            "22.开始": ["开始", "光明", "值日", "决心", "最后", "从此", "欢唱", "生机"],
+            "23.传说": ["传说", "首领", "步行", "忽然", "启发", "搬运", "号召", "民众", "自由", "道理", "根本", "果然", "提供", "便利"],
+            "24.洪水": ["洪水", "痛苦", "百姓", "必须", "反而", "仍然", "治服", "继续", "采用", "奔波", "带领", "农业", "安居乐业"]
+        },
+        "知识清单 (图片内容：按单元)": {
+            "第一单元": ["古诗", "碧玉", "化妆", "绿色", "丝带", "剪刀", "儿童", "回归", "春天", "寻找", "眉毛", "野花", "柳枝", "桃花", "冲走", "吐字", "见闻", "荡秋千", "鲜花", "先生", "原来", "大叔", "太太", "做客", "正巧", "惊奇", "快活", "美好", "礼物", "通往", "植树", "格外", "休息", "小心", "笔直", "姓邓", "满意", "场所", "剧本", "碧空如洗", "万里无云", "引人注目"],
+            "第二单元": ["叔叔", "昨天", "温暖", "爱心", "雷锋", "背后", "洒水", "流汗", "好奇", "也许", "桌子", "平时", "难道", "平常", "农民", "加工", "农具", "甜菜", "工具", "劳动", "经过", "应该", "尝试", "买菜", "甘甜", "汁水", "弱小", "周末", "父母", "吸引", "芬芳", "雨衣", "快递", "勇敢", "为什么", "工程", "算术", "服务"],
+            "第三单元": ["神州", "中华", "山川", "长江", "长城", "民族", "情谊", "各自", "整齐", "传统", "节日", "春节", "花灯", "清明节", "先人", "龙舟", "中秋", "转眼", "团圆", "粘贴", "街道", "打扫", "艾草", "完全", "真正", "故事", "生活", "甲骨文", "样子", "有关", "感觉", "食品", "钱币", "钱财", "与其", "美食", "茄子", "烤鸭", "水煮鱼", "羊肉", "蛋炒饭", "母鸡", "辣味", "在乎"],
+            "第四单元": ["彩色", "铅笔盒", "森林", "雪松", "歌声", "苹果", "精灵", "季节", "流动", "梦想", "生硬", "结果", "出色", "马匹", "妹妹", "碧绿", "波纹", "恋恋不舍", "柳树", "枝条", "不时", "请求", "奔跑", "绿色", "一直", "说话", "童话", "旁边", "阿姨", "发现", "弟弟", "发明", "拼音", "字母", "上升", "方便", "教书", "坦克"],
+            "第五单元": ["劝告", "禾苗", "力气", "明白", "死亡", "丢失", "帮助", "坏处", "杨桃", "图画", "讲桌", "座位", "教室", "时候", "五角星", "画纸", "神情", "排队", "而且", "班级", "举手", "愿意", "飞快", "为难", "伯伯", "立刻", "突然", "吃惊", "认真", "难为情", "小麦", "掉头", "商人", "广厦", "小洞", "穴位", "亡羊补牢", "哈哈大笑", "老老实实"],
+            "第六单元": ["门窗", "包含", "山岭", "泊车", "吴国", "干净", "莲花", "映照", "雷雨", "乌云", "黑沉沉", "闪电", "雷声", "窗户", "清新", "迎面", "黑白", "沉睡", "压力", "响声", "反扑", "野外", "天然", "指南针", "帮助", "方向", "忠实", "向导", "指点", "北极星", "永远", "黑夜", "帮忙", "特别", "积雪", "航天员", "宇宙飞船", "空间站", "活动", "主要", "方便", "直接", "浴桶", "清理", "实在", "通常", "或许", "茶馆", "所有"],
+            "第七单元": ["大象", "耳朵", "扇子", "似得", "慢慢", "遇到", "一定", "毛病", "每天", "睡觉", "经常", "头痛", "人家", "根本", "决定", "商店", "河马", "功夫", "终于", "星期", "需要", "支付", "青蛙", "怎么样", "野鸭", "泉水", "花丛", "尽情", "游泳", "卖掉", "搬家", "倒立", "砍刀", "破皮", "新奇", "目光", "到处", "仿佛", "周游", "任何", "事情", "纺织", "怎样", "以前", "灵巧", "色彩", "花纹", "合并", "迟到", "学校", "内心"],
+            "第八单元": ["开始", "光明", "值日", "决心", "最后", "从此", "欢唱", "生机", "射去", "交换", "拉弓", "炎热", "传说", "首领", "步行", "忽然", "启发", "搬运", "号召", "民众", "自由", "道理", "根本", "果然", "提供", "便利", "完全", "冷却", "洪水", "痛苦", "百姓", "灾难", "必须", "反而", "仍然", "继续", "采用", "奔波", "带领", "农业", "灿烂", "安居乐业"]
+        }
+    }
+};
+
+const synth = window.speechSynthesis;
+let currentWords = [];
+let currentIndex = 0;
+let isPlaying = false;
+let timer = null;
+
+// --- 初始化逻辑 ---
+function init() {
+    const vSel = document.getElementById('verSelect');
+    vSel.innerHTML = Object.keys(TEXTBOOK_DATA).map(v => `<option value="${v}">${v}</option>`).join('');
+    
+    const savedCustom = localStorage.getItem('CUSTOM_WORDS_VAL');
+    if(savedCustom) document.getElementById('customWordsInput').value = savedCustom;
+
+    updateUnits();
+    updateMistakeUI();
+}
+
+function updateUnits() {
+    const v = document.getElementById('verSelect').value;
+    const uSel = document.getElementById('unitSelect');
+    uSel.innerHTML = Object.keys(TEXTBOOK_DATA[v]).map(u => `<option value="${u}">${u}</option>`).join('');
+    updateLessons();
+}
+
+function updateLessons() {
+    const v = document.getElementById('verSelect').value;
+    const u = document.getElementById('unitSelect').value;
+    const lSel = document.getElementById('lessonSelect');
+    lSel.innerHTML = Object.keys(TEXTBOOK_DATA[v][u]).map(l => `<option value="${l}">${l}</option>`).join('');
+}
+
+function switchModule(moduleName) {
+    document.querySelectorAll('.tab-item, .view-panel').forEach(el => el.classList.remove('active'));
+    if (moduleName === 'dictation') {
+        document.querySelectorAll('.tab-item')[0].classList.add('active');
+        document.getElementById('dictationView').classList.add('active');
+    } else {
+        document.querySelectorAll('.tab-item')[1].classList.add('active');
+        document.getElementById('mistakeBookView').classList.add('active');
+        renderMistakeList();
+    }
+}
+
+function toggleMode() {
+    const mode = document.getElementById('modeSelect').value;
+    document.getElementById('textbookControls').style.display = (mode === 'textbook' ? 'block' : 'none');
+    document.getElementById('customControls').style.display = (mode === 'custom' ? 'block' : 'none');
+}
+
+// --- 听写控制核心 ---
+function startDictation() {
+    const mode = document.getElementById('modeSelect').value;
+    if (mode === 'mistakeMode') {
+        currentWords = getMistakes();
+        if (!currentWords.length) return alert("错题本是空的！");
+    } else if (mode === 'custom') {
+        const val = document.getElementById('customWordsInput').value.trim();
+        if (!val) return alert("请输入词语！");
+        currentWords = val.split(/[,\s，\n]+/).filter(w => w.length > 0);
+        localStorage.setItem('CUSTOM_WORDS_VAL', val);
+    } else {
+        const v = document.getElementById('verSelect').value, u = document.getElementById('unitSelect').value, l = document.getElementById('lessonSelect').value;
+        currentWords = TEXTBOOK_DATA[v][u][l];
+    }
+    
+    currentIndex = 0; isPlaying = true;
+    setUIPlaying(true);
+    document.getElementById('reinforceArea').style.display = "none";
+    document.getElementById('wordHidden').style.display = "block";
+    runPlayer();
+}
+
+function stopAndSwitch() {
+    isPlaying = false; clearTimeout(timer); synth.cancel();
+    setUIPlaying(false);
+    document.getElementById('wordHidden').innerText = "已停止";
+}
+
+function setUIPlaying(playState) {
+    document.getElementById('startBtn').style.display = playState ? "none" : "block";
+    document.getElementById('stopBtn').style.display = playState ? "block" : "none";
+    const ids = ['modeSelect', 'verSelect', 'unitSelect', 'lessonSelect', 'interval', 'repeat', 'customWordsInput'];
+    ids.forEach(id => { const el = document.getElementById(id); if(el) el.disabled = playState; });
+}
+
+async function runPlayer() {
+    if (!isPlaying || currentIndex >= currentWords.length) { if (currentIndex >= currentWords.length) finishDictation(); return; }
+    const word = currentWords[currentIndex];
+    document.getElementById('wordHidden').innerText = "???";
+    document.getElementById('progressInfo').innerText = `正在听写：${currentIndex + 1} / ${currentWords.length}`;
+    const repeat = parseInt(document.getElementById('repeat').value);
+    for (let i = 0; i < repeat; i++) {
+        if (!isPlaying) return;
+        await speak(word);
+        await new Promise(r => setTimeout(r, 1500));
+    }
+    timer = setTimeout(() => { currentIndex++; runPlayer(); }, parseInt(document.getElementById('interval').value) * 1000);
+}
+
+function speak(text) {
+    return new Promise(res => {
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'zh-CN'; u.rate = 0.8; u.onend = res;
+        synth.speak(u);
+    });
+}
+
+function finishDictation() {
+    isPlaying = false; setUIPlaying(false);
+    document.getElementById('wordHidden').style.display = "none";
+    const mode = document.getElementById('modeSelect').value, grid = document.getElementById('checkGrid'), tip = document.getElementById('reinforceTip');
+    document.getElementById('reinforceArea').style.display = "block";
+    grid.innerHTML = "";
+    if (mode === 'mistakeMode') {
+        tip.innerHTML = "🎯 强化核对：点击写对的词移出";
+        currentWords.forEach(word => {
+            const el = document.createElement('div'); el.className = "word-tag still-wrong"; el.innerText = word;
+            el.onclick = () => { el.className = "word-tag done"; removeMistake(word); setTimeout(() => el.style.visibility = 'hidden', 400); };
+            grid.appendChild(el);
+        });
+    } else {
+        tip.innerHTML = "📝 核对：点击写错的词存入错题本";
+        currentWords.forEach(word => {
+            const el = document.createElement('div'); el.className = "word-tag"; el.innerText = word;
+            el.onclick = () => { if (el.classList.contains('still-wrong')) { el.classList.remove('still-wrong'); removeMistake(word); } else { el.classList.add('still-wrong'); addMistake(word); } };
+            grid.appendChild(el);
+        });
+    }
+}
+
+// --- 错题本辅助 ---
+function getMistakes() { return JSON.parse(localStorage.getItem('MISTAKE_STORAGE') || "[]"); }
+function addMistake(word) { let list = getMistakes(); if (!list.includes(word)) { list.push(word); localStorage.setItem('MISTAKE_STORAGE', JSON.stringify(list)); updateMistakeUI(); } }
+function removeMistake(word) { let list = getMistakes().filter(w => w !== word); localStorage.setItem('MISTAKE_STORAGE', JSON.stringify(list)); updateMistakeUI(); }
+function updateMistakeUI() { document.getElementById('mistakeBadge').innerText = getMistakes().length; }
+function renderMistakeList() {
+    const listContainer = document.getElementById('mistakeList');
+    const mistakes = getMistakes();
+    listContainer.innerHTML = mistakes.length ? mistakes.map(word => `<div class="mistake-item"><b>${word}</b><span class="btn-del" onclick="removeMistake('${word}'); renderMistakeList();">移除</span></div>`).join('') : '<div style="text-align:center;color:#ccc;margin-top:40px;">暂无错题</div>';
+}
+function clearAllMistakes() { if(confirm("确定清空吗？")){ localStorage.setItem('MISTAKE_STORAGE', "[]"); updateMistakeUI(); renderMistakeList(); }}
+function quickDictMistakes() { switchModule('dictation'); document.getElementById('modeSelect').value = 'mistakeMode'; toggleMode(); startDictation(); }
+function navControl(type) {
+    clearTimeout(timer); synth.cancel();
+    if (type === 'next') currentIndex = Math.min(currentWords.length - 1, currentIndex + 1);
+    if (type === 'prev') currentIndex = Math.max(0, currentIndex - 1);
+    if (isPlaying) runPlayer();
+}
+
+init();
+</script>
+</body>
+</html>
