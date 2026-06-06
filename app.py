@@ -1,11 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 设置页面配置
-st.set_page_config(page_title="小学生智能听写助手", layout="centered")
+# 页面配置
+st.set_page_config(page_title="同步听写助手", layout="centered")
 
-# 定义我们的核心 HTML/JS 程序（包含 240 词库）
-# 这里直接集成了之前沟通的所有功能：三级联动、错题本、自定义听写、停止切换
+# 核心程序
 html_code = """
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -15,7 +14,7 @@ html_code = """
     <style>
         :root { --primary: #648dd1; --bg: #ffffff; --danger: #e56b60; --success: #78c2ad; --text: #333; }
         body { font-family: 'PingFang SC', sans-serif; background: #f0f2f5; margin: 0; padding: 5px; display: flex; justify-content: center; }
-        .container { background: white; width: 100%; max-width: 500px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; min-height: 90vh; }
+        .container { background: white; width: 100%; max-width: 500px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; min-height: 95vh; }
         .nav-tabs { display: flex; background: #fff; border-bottom: 1px solid #eee; }
         .tab-item { flex: 1; text-align: center; padding: 15px 0; cursor: pointer; font-weight: bold; color: #999; position: relative; }
         .tab-item.active { color: var(--primary); }
@@ -25,15 +24,16 @@ html_code = """
         .view-panel.active { display: block; }
         .card-box { background: #f8f9fa; padding: 12px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; }
         label { display: block; margin-bottom: 4px; font-weight: bold; color: #666; font-size: 13px; }
-        select, input, textarea { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 15px; box-sizing: border-box; margin-bottom: 8px; outline: none; background: #fff; }
-        .player-card { text-align: center; padding: 25px 10px; border: 2px dashed #d0d7de; border-radius: 15px; margin: 10px 0; background: #fff; min-height: 120px; display: flex; flex-direction: column; justify-content: center; }
-        #wordHidden { font-size: 40px; font-weight: bold; color: var(--primary); }
-        .btn-main { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; }
-        .btn-stop { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; padding: 14px; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; display: none; }
+        select, input, textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; margin-bottom: 8px; outline: none; background: #fff; }
+        textarea { resize: vertical; min-height: 80px; }
+        .player-card { text-align: center; padding: 30px 10px; border: 2px dashed #d0d7de; border-radius: 15px; margin: 10px 0; background: #fff; min-height: 140px; display: flex; flex-direction: column; justify-content: center; }
+        #wordHidden { font-size: 45px; font-weight: bold; color: var(--primary); }
+        .btn-main { background: var(--primary); color: white; border: none; padding: 16px; border-radius: 14px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; }
+        .btn-stop { background: #fff1f0; color: #cf1322; border: 1px solid #ffa39e; padding: 16px; border-radius: 14px; font-size: 18px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; display: none; }
         .btn-group-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-        .btn-sub { background: #edf2f7; border: none; padding: 10px; border-radius: 10px; color: #4a5568; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .btn-sub { background: #edf2f7; border: none; padding: 12px; border-radius: 10px; color: #4a5568; font-weight: bold; cursor: pointer; font-size: 14px; }
         .word-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-        .word-tag { padding: 12px; border: 1px solid #eee; border-radius: 10px; text-align: center; cursor: pointer; font-weight: bold; background: #fff; font-size: 16px; }
+        .word-tag { padding: 15px; border: 1px solid #eee; border-radius: 10px; text-align: center; cursor: pointer; font-weight: bold; background: #fff; font-size: 18px; }
         .word-tag.done { border-color: var(--success); color: var(--success); background: #f6ffed; }
         .word-tag.still-wrong { border-color: var(--danger); color: var(--danger); background: #fff1f0; }
         .mistake-item { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px; border-radius: 10px; margin-bottom: 5px; border: 1px solid #eee; }
@@ -44,27 +44,29 @@ html_code = """
 <body>
 <div class="container">
     <div class="nav-tabs">
-        <div class="tab-item active" onclick="switchModule('dictation')">听写</div>
+        <div class="tab-item active" onclick="switchModule('dictation')">听写模块</div>
         <div class="tab-item" onclick="switchModule('mistakeBook')">错题本<span id="mistakeBadge" class="badge">0</span></div>
     </div>
     <div class="module-content">
         <div id="dictationView" class="view-panel active">
             <div class="card-box">
-                <label>模式</label>
+                <label>练习模式</label>
                 <select id="modeSelect" onchange="toggleMode()">
-                    <option value="textbook">课本同步</option>
-                    <option value="custom">✨ 自定义</option>
-                    <option value="mistakeMode">🔥 错题强化</option>
+                    <option value="textbook">课本同步联动听写</option>
+                    <option value="custom">✨ 自定义词语听写</option>
+                    <option value="mistakeMode">🔥 错题强化挑战</option>
                 </select>
+                <!-- 课本联动 -->
                 <div id="textbookControls">
                     <label>版本 & 单元 & 课文</label>
                     <select id="verSelect" onchange="updateUnits()"></select>
                     <select id="unitSelect" onchange="updateLessons()"></select>
                     <select id="lessonSelect"></select>
                 </div>
+                <!-- 自定义输入 -->
                 <div id="customControls" style="display:none;">
-                    <label>输入词语</label>
-                    <textarea id="customWordsInput" placeholder="词语间用空格或逗号分隔"></textarea>
+                    <label>输入词语 (逗号或空格分隔)</label>
+                    <textarea id="customWordsInput" placeholder="在此输入新词语..."></textarea>
                 </div>
                 <div style="display:flex; gap:10px;">
                     <div style="flex:1"><label>间隔(s)</label><input type="number" id="interval" value="6"></div>
@@ -73,7 +75,7 @@ html_code = """
             </div>
             <div class="player-card">
                 <div id="wordHidden">准备就绪</div>
-                <div id="progressInfo" style="color:#999; font-size:12px; margin-top:5px;"></div>
+                <div id="progressInfo" style="color:#999; font-size:13px; margin-top:5px;"></div>
                 <div id="reinforceArea" style="display:none; margin-top:10px;">
                     <div id="reinforceTip" style="font-weight:bold; font-size:13px; margin-bottom:5px;"></div>
                     <div class="word-grid" id="checkGrid"></div>
@@ -90,12 +92,13 @@ html_code = """
         <div id="mistakeBookView" class="view-panel">
             <button class="btn-main" onclick="quickDictMistakes()">🎧 听写所有错题</button>
             <div id="mistakeList"></div>
-            <button class="btn-sub" style="width:100%;margin-top:20px;color:red;" onclick="clearAllMistakes()">清空错题</button>
+            <button class="btn-sub" style="width:100%;margin-top:20px;color:red;" onclick="clearAllMistakes()">清空全部错题</button>
         </div>
     </div>
 </div>
 
 <script>
+// 1. 240词库数据
 const TEXTBOOK_DATA = {
     "人教版语文二下": {
         "词语表 (240词)": {
@@ -132,12 +135,23 @@ const TEXTBOOK_DATA = {
 const synth = window.speechSynthesis;
 let currentWords = []; let currentIndex = 0; let isPlaying = false; let timer = null;
 
-function init() {
+// 初始化函数：确保在页面加载时执行
+function initApp() {
+    console.log("初始化程序...");
     const vSel = document.getElementById('verSelect');
+    if(!vSel) return;
+    
+    // 填充版本
     vSel.innerHTML = Object.keys(TEXTBOOK_DATA).map(v => `<option value="${v}">${v}</option>`).join('');
+    
+    // 加载保存的自定义词
     const savedCustom = localStorage.getItem('CUSTOM_WORDS_VAL');
     if(savedCustom) document.getElementById('customWordsInput').value = savedCustom;
-    updateUnits(); updateMistakeUI();
+
+    // 触发联动
+    updateUnits(); 
+    updateMistakeUI();
+    toggleMode(); // 确保模式显示正确
 }
 
 function updateUnits() {
@@ -238,7 +252,7 @@ function finishDictation() {
             grid.appendChild(el);
         });
     } else {
-        tip.innerHTML = "📝 点击写错的词存入错题本";
+        tip.innerHTML = "📝 点击写错的词存出错题本";
         currentWords.forEach(word => {
             const el = document.createElement('div'); el.className = "word-tag"; el.innerText = word;
             el.onclick = () => { if (el.classList.contains('still-wrong')) { el.classList.remove('still-wrong'); removeMistake(word); } else { el.classList.add('still-wrong'); addMistake(word); } };
@@ -263,11 +277,15 @@ function navControl(t) {
     if (t === 'prev') currentIndex = Math.max(0, currentIndex - 1);
     if (isPlaying) runPlayer();
 }
-init();
+
+// 强制在页面所有内容加载后执行初始化
+window.addEventListener('load', initApp);
+// Streamlit 有时渲染较快，补充一个定时检查
+setTimeout(initApp, 100);
 </script>
 </body>
 </html>
 """
 
-# 在 Streamlit 中嵌入 HTML
+# Streamlit 渲染设置
 components.html(html_code, height=900, scrolling=True)
